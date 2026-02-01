@@ -25,7 +25,7 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	// Initialize the client and config
-	pokeClient := pokeapi.NewClient(5 * time.Second)
+	pokeClient := pokeapi.NewClient(5*time.Second, 5*time.Minute)
 	cfg := &config{
 		pokeapiClient: pokeClient,
 	}
