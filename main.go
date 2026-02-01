@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 
@@ -14,6 +15,7 @@ type config struct {
 	pokeapiClient    pokeapi.Client
 	nextLocationsURL *string
 	prevLocationsURL *string
+	pokedex          map[string]pokeapi.Pokemon
 }
 
 type cliCommand struct {
@@ -29,6 +31,7 @@ func main() {
 	pokeClient := pokeapi.NewClient(5*time.Second, 5*time.Minute)
 	cfg := &config{
 		pokeapiClient: pokeClient,
+		pokedex:       make(map[string]pokeapi.Pokemon),
 	}
 
 	commands := getCommands()
@@ -88,6 +91,16 @@ func getCommands() map[string]cliCommand {
 			name:        "explore <area_name>",
 			description: "List pokemon in a location area",
 			callback:    commandExplore,
+		},
+		"catch": {
+			name:        "catch <pokemon_name>",
+			description: "Attempt to catch a pokemon",
+			callback:    commandCatch,
+		},
+		"inspect": {
+			name:        "inspect <pokemon_name>",
+			description: "View details about a caught pokemon",
+			callback:    commandInspect,
 		},
 	}
 }
@@ -162,6 +175,72 @@ func commandExplore(cfg *config, args []string) error {
 	fmt.Println("Found Pokemon:")
 	for _, enc := range locationResp.PokemonEncounters {
 		fmt.Printf(" - %s\n", enc.Pokemon.Name)
+	}
+
+	return nil
+}
+
+func commandCatch(cfg *config, args []string) error {
+	if len(args) != 1 {
+		return errors.New("you must provide a pokemon name")
+	}
+
+	name := args[0]
+	pokemon, err := cfg.pokeapiClient.GetPokemon(name)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Throwing a Pokeball at %s...\n", pokemon.Name)
+
+	// Catch Logic:
+	// Higher BaseExperience = Harder to catch.
+	// We generate a random number between 0 and BaseExperience.
+	// If the number is greater than 40, we fail.
+	//
+	// Example:
+	// Caterpie (BaseExp ~40): rand(40) is always < 40. Catch = 100%
+	// Mewtwo (BaseExp ~300): rand(300) is rarely < 40. Catch = ~13%
+
+	res := rand.Intn(pokemon.BaseExperience)
+
+	if res > 40 {
+		fmt.Printf("%s escaped!\n", pokemon.Name)
+		return nil
+	}
+
+	fmt.Printf("%s was caught!\n", pokemon.Name)
+	fmt.Println("You may now inspect it with the inspect command.") // Hint for next step
+
+	cfg.pokedex[pokemon.Name] = pokemon
+	return nil
+}
+
+func commandInspect(cfg *config, args []string) error {
+	if len(args) != 1 {
+		return errors.New("you must provide a pokemon name")
+	}
+
+	name := args[0]
+
+	// Check if the pokemon exists in our map
+	pokemon, ok := cfg.pokedex[name]
+	if !ok {
+		return errors.New("you have not caught that pokemon")
+	}
+
+	fmt.Printf("Name: %s\n", pokemon.Name)
+	fmt.Printf("Height: %d\n", pokemon.Height)
+	fmt.Printf("Weight: %d\n", pokemon.Weight)
+
+	fmt.Println("Stats:")
+	for _, stat := range pokemon.Stats {
+		fmt.Printf("  -%s: %d\n", stat.Stat.Name, stat.BaseStat)
+	}
+
+	fmt.Println("Types:")
+	for _, typeInfo := range pokemon.Types {
+		fmt.Printf("  - %s\n", typeInfo.Type.Name)
 	}
 
 	return nil
