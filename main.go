@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MasterOogway1466/pokedexcli/internal/pokeapi"
+	"github.com/chzyer/readline"
 )
 
 type config struct {
@@ -25,9 +25,14 @@ type cliCommand struct {
 }
 
 func main() {
-	scanner := bufio.NewScanner(os.Stdin)
+	// 1. Initialize the Readline Instance
+	// This replaces bufio.Scanner
+	rl, err := readline.New("Pokedex > ")
+	if err != nil {
+		panic(err)
+	}
+	defer rl.Close()
 
-	// Initialize the client and config
 	pokeClient := pokeapi.NewClient(5*time.Second, 5*time.Minute)
 	cfg := &config{
 		pokeapiClient: pokeClient,
@@ -37,11 +42,14 @@ func main() {
 	commands := getCommands()
 
 	for {
-		fmt.Print("Pokedex > ")
-		scanner.Scan()
+		// 2. Read input using rl.Readline()
+		// It automatically handles the "Pokedex > " prompt and history
+		line, err := rl.Readline()
+		if err != nil { // Check for errors (like Ctrl+C or Ctrl+D)
+			break
+		}
 
-		text := scanner.Text()
-		cleaned := cleanInput(text)
+		cleaned := cleanInput(line)
 		if len(cleaned) == 0 {
 			continue
 		}
@@ -54,7 +62,6 @@ func main() {
 
 		command, exists := commands[commandName]
 		if exists {
-			// Pass the config pointer to the callback
 			err := command.callback(cfg, args)
 			if err != nil {
 				fmt.Println(err)
